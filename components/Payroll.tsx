@@ -1,3 +1,4 @@
+console.log("🔥 새 코드 실행됨");
 import React, { useState, useMemo } from 'react';
 import { MOCK_EMPLOYEES, BRANCH_NAMES, MOCK_HOLIDAYS } from '../constants';
 import { Employee, AttendanceRecord, AttendanceStatus, AttendanceTag, ApprovalRequest } from '../types';
