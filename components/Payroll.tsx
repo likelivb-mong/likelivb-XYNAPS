@@ -1,4 +1,3 @@
-console.log("🔥 새 코드 실행됨");
 import React, { useState, useMemo } from 'react';
 import { MOCK_EMPLOYEES, BRANCH_NAMES, MOCK_HOLIDAYS } from '../constants';
 import { Employee, AttendanceRecord, AttendanceStatus, AttendanceTag, ApprovalRequest } from '../types';
@@ -181,54 +180,59 @@ const Payroll: React.FC<{
     downloadCSV(`payroll_${selectedMonth}`, rows);
   };
 
- const handleGoogleSheetUpload = async () => {
-  if (isUploading) return;
+  // ✅ 여기가 핵심: 업로드 버튼 누르면 실제 서버 응답을 alert로 보여줌
+  const handleGoogleSheetUpload = async () => {
+    if (isUploading) return;
 
-  if (!selectedMonth) {
-    alert("정산 월이 선택되지 않았습니다.");
-    return;
-  }
-
-  const rows = payrollData.map(p => ({
-    month: selectedMonth,
-    branch: BRANCH_NAMES[p.employee.branch],
-    name: p.employee.name,
-    totalMinutes: p.stats.totalMinutes,
-    basePay: p.stats.totalBasePay,
-    holidayPay: p.stats.totalHolidayPay,
-    expenses: p.stats.totalExpenses,
-    grossTotal: p.stats.grossTotal,
-    taxAmount: p.stats.taxAmount,
-    netPay: p.stats.grandTotal
-  }));
-
-  if (rows.length === 0) {
-    alert("업로드할 데이터가 없습니다.");
-    return;
-  }
-
-  setIsUploading(true);
-
-  try {
-    const result = await uploadPayrollToSheet(rows);
-
-    // ✅ 콘솔에 서버 응답 출력
-    console.log("=== 업로드 서버 응답 ===");
-    console.log(result);
-
-    if (result?.ok) {
-      alert("업로드 요청은 성공했습니다. 콘솔(F12)에서 응답을 확인하세요.");
-    } else {
-      alert("❌ 서버 응답 오류. 콘솔(F12)을 확인하세요.");
+    if (!selectedMonth) {
+      alert("정산 월이 선택되지 않았습니다.");
+      return;
     }
 
-  } catch (e) {
-    console.error("업로드 오류:", e);
-    alert("❌ 업로드 중 에러 발생. 콘솔(F12)을 확인하세요.");
-  } finally {
-    setIsUploading(false);
-  }
-};
+    const rows = payrollData.map(p => ({
+      month: selectedMonth,
+      branch: BRANCH_NAMES[p.employee.branch],
+      name: p.employee.name,
+      totalMinutes: p.stats.totalMinutes,
+      basePay: p.stats.totalBasePay,
+      holidayPay: p.stats.totalHolidayPay,
+      expenses: p.stats.totalExpenses,
+      grossTotal: p.stats.grossTotal,
+      taxAmount: p.stats.taxAmount,
+      netPay: p.stats.grandTotal
+    }));
+
+    if (rows.length === 0) {
+      alert("업로드할 데이터가 없습니다.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const result = await uploadPayrollToSheet(rows);
+
+      console.log("서버 응답:", result);
+      alert(JSON.stringify(result));
+
+      if (result?.ok) {
+        const written = result.written !== undefined ? result.written : "알 수 없음";
+        const sheetName = result.sheet || "알 수 없음";
+
+        if (result.written === 0) {
+          alert("⚠️ 서버 연결 성공, 하지만 저장된 데이터가 0건입니다.\n(급여 데이터가 비어있거나, 서버가 다른 시트로 쓰고 있을 수 있어요.)");
+        } else {
+          alert(`✅ 업로드 성공!\n\n- 저장된 행 개수: ${written}\n- 저장된 시트(탭): ${sheetName}\n\n구글 시트에서 '${sheetName}' 탭을 확인해보세요.`);
+        }
+      } else {
+        alert("❌ 업로드 실패: " + (result?.error || result?.message || "알 수 없는 오류"));
+      }
+    } catch (e) {
+      console.error(e);
+      alert("❌ 업로드 중 오류: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-20">
