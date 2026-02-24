@@ -11,6 +11,7 @@ import CrewNotifications from './components/CrewNotifications';
 import Login from './components/Login';
 import { UserRole, Employee, BranchCode, EmployeeRank, AttendanceRecord, ApprovalRequest, AttendanceStatus, AttendanceTag, Schedule } from './types';
 import { supabase } from './lib/supabaseClient';
+import { MOCK_EMPLOYEES, MOCK_SCHEDULES, MOCK_ATTENDANCE, MOCK_APPROVALS } from './constants';
 
 const App: React.FC = () => {
   // Auth State
@@ -21,15 +22,17 @@ const App: React.FC = () => {
   const [userRole, setUserRole] = useState<UserRole>(UserRole.MANAGER);
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
 
-  // Data State
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  // Data State - Initialize with Mock Data
+  const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(MOCK_ATTENDANCE);
+  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>(MOCK_APPROVALS);
+  const [schedules, setSchedules] = useState<Schedule[]>(MOCK_SCHEDULES);
 
-  // Initialization (Data Fetching from Supabase)
+  // Initialization (Data Fetching from Supabase - Disabled for now to restore functionality)
   useEffect(() => {
     const fetchData = async () => {
+      // Supabase fetching logic commented out to use Mock Data
+      /*
       // 1. Fetch Employees
       const { data: empData } = await supabase.from('employees').select('*');
       if (empData) setEmployees(empData);
@@ -45,6 +48,7 @@ const App: React.FC = () => {
       // 4. Fetch Approvals
       const { data: appData } = await supabase.from('approval_requests').select('*');
       if (appData) setApprovalRequests(appData);
+      */
     };
 
     fetchData();
