@@ -297,6 +297,7 @@ const CrewDashboard: React.FC<CrewDashboardProps> = ({
                         user={currentUser} 
                         className="!bg-transparent !shadow-none !border-none !p-0 !w-full" 
                         hideHeader={true}
+                        attendanceData={attendanceData} // Pass attendanceData
                     />
                 </div>
           </div>

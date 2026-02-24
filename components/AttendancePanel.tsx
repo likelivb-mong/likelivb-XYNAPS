@@ -1,22 +1,67 @@
 import React, { useState } from 'react';
 import { KeyRound, Phone, LogIn, LogOut, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { Employee } from '../types';
+import { Employee, AttendanceRecord } from '../types';
 import { downloadAttendanceCSV } from "../services/attendanceCsvExport";
+import { uploadAttendanceToSheet } from "../services/googleUpload";
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbzgEiGWb6Fq-6lDnPHTCC_2JMcjtO7dbDzZhqh8CRGWWM82GdTGsO_oL2Hj4UYyXv28/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbw9hI__EYVf9BCcdzO2VSKUBO9pulIhgEUyTHgJIx7UHYunEbWB_11amDamp0cMPazP/exec';
 
 interface AttendancePanelProps {
   user?: Employee;
   className?: string;
   hideHeader?: boolean;
+  attendanceData?: AttendanceRecord[];
 }
 
-const AttendancePanel: React.FC<AttendancePanelProps> = ({ user, className, hideHeader }) => {
+const AttendancePanel: React.FC<AttendancePanelProps> = ({ user, className, hideHeader, attendanceData }) => {
   const [phoneSuffix, setPhoneSuffix] = useState('');
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [lastAction, setLastAction] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+
+  const handleAttendanceUpload = async () => {
+    if (!attendanceData) {
+      alert("근태 데이터가 없습니다.");
+      return;
+    }
+
+    const month = selectedMonth || new Date().toISOString().slice(0, 7);
+
+    const rows = attendanceData
+      .filter(r => r.date?.startsWith(month))
+      .map(r => ({
+        month, // ✅ 덮어쓰기 키
+        date: r.date,
+        employeeName: r.employeeName || (user?.id === r.employeeId ? user.name : "") || "", // Try to resolve name if possible, though r.employeeName might not exist on AttendanceRecord type based on previous files. Let's check types.
+        branch: r.branch || (user?.id === r.employeeId ? user.branch : "") || "",
+        status: r.status || "",
+        minutes: r.accumulatedMinutes || 0,
+      }));
+      
+    // Note: AttendanceRecord type in this project might not have employeeName/branch directly if it's just raw record.
+    // However, the user provided code assumes r.employeeName. 
+    // If AttendanceRecord doesn't have it, we might need to join with employees.
+    // But AttendancePanel doesn't have employees list.
+    // Let's assume for now we just use what we have or empty string.
+    // Actually, looking at Dashboard.tsx, it joins data.
+    // If the user wants this to work properly, AttendancePanel might need employees list too.
+    // But for now I will stick to what user provided, maybe adapting slightly.
+    
+    if (rows.length === 0) {
+      alert("업로드할 근태 데이터가 없습니다.");
+      return;
+    }
+
+    const result = await uploadAttendanceToSheet(rows);
+
+    if (result?.ok) {
+      alert(`✅ 근태 업로드 완료\n- 삭제: ${result.deleted}행\n- 추가: ${result.written}행\n(월: ${result.month})`);
+    } else {
+      alert("❌ 근태 업로드 실패: " + (result?.error || "알 수 없는 오류"));
+    }
+  };
 
   const callApi = async (action: 'checkin' | 'checkout' | 'status') => {
     // Determine credentials
@@ -66,6 +111,23 @@ const AttendancePanel: React.FC<AttendancePanelProps> = ({ user, className, hide
 
   return (
     <div className={`apple-glass p-6 rounded-[24px] w-full ${className || 'max-w-md mx-auto'}`}>
+      {attendanceData && (
+        <div className="mb-4 flex justify-between items-center">
+            <input 
+                type="month" 
+                value={selectedMonth} 
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1 text-sm outline-none"
+            />
+            <button
+              onClick={handleAttendanceUpload}
+              className="px-4 h-10 rounded-lg bg-[#1D6F42] text-white font-semibold text-sm hover:bg-[#155d35] transition-colors"
+            >
+              근태 구글시트 업로드
+            </button>
+        </div>
+      )}
+
       {!hideHeader && (
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">

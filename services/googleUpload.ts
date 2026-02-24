@@ -1,30 +1,28 @@
-const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbzgEiGWb6Fq-6lDnPHTCC_2JMcjtO7dbDzZhqh8CRGWWM82GdTGsO_oL2Hj4UYyXv28/exec"; // Updated
+const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbw9hI__EYVf9BCcdzO2VSKUBO9pulIhgEUyTHgJIx7UHYunEbWB_11amDamp0cMPazP/exec";
+
+async function postToScript(body: any) {
+  const res = await fetch(SHEET_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" }, // preflight 회피
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(`HTTP Error: ${res.status}`);
+  }
+  return await res.json();
+}
 
 export async function uploadPayrollToSheet(data: any[]) {
-  try {
-    console.log("Uploading to:", SHEET_API_URL);
-    console.log("Payload:", data);
+  return await postToScript({
+    action: "uploadPayroll",
+    payload: data,
+  });
+}
 
-    const res = await fetch(SHEET_API_URL, {
-      method: "POST",
-      // Google Apps Script often has issues with CORS preflight (OPTIONS) for application/json.
-      // Using text/plain avoids the preflight request.
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
-      body: JSON.stringify({
-        action: "uploadPayroll", // Must match the Apps Script handler
-        payload: data
-      })
-    });
-
-    if (!res.ok) {
-      throw new Error(`HTTP Error: ${res.status}`);
-    }
-
-    return await res.json();
-  } catch (error) {
-    console.error("Upload failed:", error);
-    return { result: "error", message: error instanceof Error ? error.message : "Unknown error" };
-  }
+export async function uploadAttendanceToSheet(data: any[]) {
+  return await postToScript({
+    action: "uploadAttendance",
+    payload: data,
+  });
 }
