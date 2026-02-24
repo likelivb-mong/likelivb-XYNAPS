@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { Employee, AttendanceRecord, Schedule } from "../types";
 
-const apiKey = process.env.API_KEY || ''; // In a real app, ensure this is set
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
 
 export const generateWorkforceInsight = async (
