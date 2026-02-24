@@ -146,7 +146,7 @@ const Payroll: React.FC<{
       stats: calculateStats(emp, selectedMonth)
     }));
 
-  }, [activeTab, selectedMonth, attendanceData, approvalRequests, isCrewMode, currentUser]);
+  }, [activeTab, selectedMonth, attendanceData, approvalRequests]);
 
   const aggregates = {
     count: payrollData.length,
@@ -159,7 +159,9 @@ const Payroll: React.FC<{
       ? calculateStats(selectedEmployee, selectedMonth)
       : null;
 
+  // ✅ CSV 다운로드 기능
   const handleCSVDownload = () => {
+
     if (!selectedMonth) {
       alert("정산 월이 선택되지 않았습니다.");
       return;
@@ -180,59 +182,48 @@ const Payroll: React.FC<{
     downloadCSV(`payroll_${selectedMonth}`, rows);
   };
 
-  // ✅ 여기가 핵심: 업로드 버튼 누르면 실제 서버 응답을 alert로 보여줌
-  const handleGoogleSheetUpload = async () => {
-    if (isUploading) return;
+const handleGoogleSheetUpload = async () => {
 
-    if (!selectedMonth) {
-      alert("정산 월이 선택되지 않았습니다.");
-      return;
+  if (!selectedMonth) {
+    alert("정산 월이 선택되지 않았습니다.");
+    return;
+  }
+
+  const rows = payrollData.map(p => ({
+    month: selectedMonth,
+    branch: BRANCH_NAMES[p.employee.branch],
+    name: p.employee.name,
+    totalMinutes: p.stats.totalMinutes,
+    basePay: p.stats.totalBasePay,
+    holidayPay: p.stats.totalHolidayPay,
+    expenses: p.stats.totalExpenses,
+    grossTotal: p.stats.grossTotal,
+    taxAmount: p.stats.taxAmount,
+    netPay: p.stats.grandTotal
+  }));
+
+  if (rows.length === 0) {
+    alert("업로드할 데이터가 없습니다.");
+    return;
+  }
+
+  const result = await uploadPayrollToSheet(rows);
+
+  console.log("Upload Result:", result);
+
+  if (result.ok) {
+    const written = result.written !== undefined ? result.written : "알 수 없음";
+    const sheetName = result.sheet || "알 수 없음";
+    
+    if (result.written === 0) {
+      alert(`⚠️ 서버 연결 성공, 하지만 저장된 데이터가 0건입니다.\n서버 로그를 확인해주세요.`);
+    } else {
+      alert(`✅ 업로드 성공!\n\n- 저장된 행 개수: ${written}\n- 저장된 시트(탭): ${sheetName}\n\n구글 시트에서 '${sheetName}' 탭을 확인해보세요.\n(Spreadsheet ID: 1IyjHHJR9nU4Lrsm0uXpTF-12Ihx2aUjm1OwhucLcTM4)`);
     }
-
-    const rows = payrollData.map(p => ({
-      month: selectedMonth,
-      branch: BRANCH_NAMES[p.employee.branch],
-      name: p.employee.name,
-      totalMinutes: p.stats.totalMinutes,
-      basePay: p.stats.totalBasePay,
-      holidayPay: p.stats.totalHolidayPay,
-      expenses: p.stats.totalExpenses,
-      grossTotal: p.stats.grossTotal,
-      taxAmount: p.stats.taxAmount,
-      netPay: p.stats.grandTotal
-    }));
-
-    if (rows.length === 0) {
-      alert("업로드할 데이터가 없습니다.");
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      const result = await uploadPayrollToSheet(rows);
-
-      console.log("서버 응답:", result);
-      alert(JSON.stringify(result));
-
-      if (result?.ok) {
-        const written = result.written !== undefined ? result.written : "알 수 없음";
-        const sheetName = result.sheet || "알 수 없음";
-
-        if (result.written === 0) {
-          alert("⚠️ 서버 연결 성공, 하지만 저장된 데이터가 0건입니다.\n(급여 데이터가 비어있거나, 서버가 다른 시트로 쓰고 있을 수 있어요.)");
-        } else {
-          alert(`✅ 업로드 성공!\n\n- 저장된 행 개수: ${written}\n- 저장된 시트(탭): ${sheetName}\n\n구글 시트에서 '${sheetName}' 탭을 확인해보세요.`);
-        }
-      } else {
-        alert("❌ 업로드 실패: " + (result?.error || result?.message || "알 수 없는 오류"));
-      }
-    } catch (e) {
-      console.error(e);
-      alert("❌ 업로드 중 오류: " + (e instanceof Error ? e.message : String(e)));
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  } else {
+    alert("❌ 업로드 실패: " + (result.error || "알 수 없는 오류"));
+  }
+};
 
   return (
     <div className="space-y-6 pb-20">
@@ -290,92 +281,31 @@ const Payroll: React.FC<{
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="p-4 rounded-lg border">
-          <div className="flex items-center gap-2 text-gray-600">
-            <Building2 size={16} />
-            총 인원
-          </div>
-          <div className="text-2xl font-bold mt-1">
-            {aggregates.count}명
-          </div>
+        <div>
+          총 인원: {aggregates.count}명
         </div>
-
-        <div className="p-4 rounded-lg border">
-          <div className="flex items-center gap-2 text-gray-600">
-            <Wallet size={16} />
-            예상 지급액(세후)
-          </div>
-          <div className="text-2xl font-bold mt-1">
-            ₩{aggregates.totalNetPay.toLocaleString()}
-          </div>
+        <div>
+          예상 지급액: ₩{aggregates.totalNetPay.toLocaleString()}
         </div>
       </div>
 
       {/* 테이블 */}
-      <div className="rounded-lg border overflow-hidden">
-        <table className="w-full border-collapse">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="p-3 text-left text-sm text-gray-600">직원</th>
-              <th className="p-3 text-right text-sm text-gray-600">수령액</th>
-              <th className="p-3 w-10"></th>
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            <th>직원</th>
+            <th>수령액</th>
+          </tr>
+        </thead>
+        <tbody>
+          {payrollData.map(({ employee, stats }) => (
+            <tr key={employee.id}>
+              <td>{employee.name}</td>
+              <td>₩{stats.grandTotal.toLocaleString()}</td>
             </tr>
-          </thead>
-          <tbody>
-            {payrollData.map(({ employee, stats }) => (
-              <tr
-                key={employee.id}
-                className="border-t hover:bg-gray-50 cursor-pointer"
-                onClick={() => setSelectedEmployee(employee)}
-              >
-                <td className="p-3">
-                  <div className="font-bold">{employee.name}</div>
-                  <div className="text-xs text-gray-500">{BRANCH_NAMES[employee.branch]}</div>
-                </td>
-                <td className="p-3 text-right font-bold">
-                  ₩{stats.grandTotal.toLocaleString()}
-                  <div className="text-xs text-gray-500 font-normal">
-                    {formatDuration(stats.totalMinutes)} 근무
-                  </div>
-                </td>
-                <td className="p-3 text-right">
-                  <ChevronRight size={16} className="text-gray-300" />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* 상세 모달 (간단 버전) */}
-      {selectedEmployee && selectedStats && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-lg p-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="text-xl font-bold">{selectedEmployee.name}</div>
-                <div className="text-sm text-gray-500">{selectedMonth} 급여 상세</div>
-              </div>
-              <button
-                onClick={() => setSelectedEmployee(null)}
-                className="p-2 rounded-full hover:bg-gray-100"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between"><span>총 근무</span><b>{formatDuration(selectedStats.totalMinutes)}</b></div>
-              <div className="flex justify-between"><span>기본급</span><b>₩{selectedStats.totalBasePay.toLocaleString()}</b></div>
-              <div className="flex justify-between"><span>휴일수당</span><b>₩{selectedStats.totalHolidayPay.toLocaleString()}</b></div>
-              <div className="flex justify-between"><span>비용청구</span><b>₩{selectedStats.totalExpenses.toLocaleString()}</b></div>
-              <div className="flex justify-between"><span>과세총액</span><b>₩{selectedStats.grossTotal.toLocaleString()}</b></div>
-              <div className="flex justify-between text-red-600"><span>세금(3.3%)</span><b>- ₩{selectedStats.taxAmount.toLocaleString()}</b></div>
-              <div className="flex justify-between text-green-700 text-base border-t pt-2"><span>실수령액</span><b>₩{selectedStats.grandTotal.toLocaleString()}</b></div>
-            </div>
-          </div>
-        </div>
-      )}
+          ))}
+        </tbody>
+      </table>
 
     </div>
   );
