@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Employee, AttendanceStatus, AttendanceTag, ApprovalRequest, AttendanceRecord, ScheduleType, Schedule } from '../types';
 import { Play, Square, MapPin, CalendarClock, AlertTriangle, CheckCircle2, Timer, PartyPopper, Calendar, Clock, ChevronRight, UserCheck, X } from 'lucide-react';
 import { BRANCH_NAMES } from '../constants';
+import AttendancePanel from './AttendancePanel';
 
 interface CrewDashboardProps {
   currentUser: Employee;
@@ -290,31 +291,13 @@ const CrewDashboard: React.FC<CrewDashboardProps> = ({
                     )}
                 </div>
 
-                {/* Action Buttons */}
-                <div className="w-full z-10">
-                    {!isWorking && !isPending && (
-                        <button 
-                            onClick={handleClockInClick}
-                            className="w-full h-[56px] rounded-[18px] bg-gradient-to-r from-[#0A84FF] to-[#007AFF] hover:from-[#007AFF] hover:to-[#0062CC] text-white text-[16px] font-bold shadow-lg shadow-blue-500/30 flex items-center justify-center gap-3 active:scale-[0.98] transition-all"
-                        >
-                            <Play fill="currentColor" size={20} /> 출근하기
-                        </button>
-                    )}
-                    {isWorking && (
-                        <button 
-                            onClick={handleClockOutClick}
-                            className="group w-full h-[56px] rounded-[18px] bg-[#FF453A] hover:bg-[#ff3b30] text-white text-[16px] font-bold shadow-lg shadow-red-500/30 flex items-center justify-center gap-3 active:scale-[0.98] transition-all overflow-hidden relative"
-                        >
-                            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                            <Square fill="currentColor" size={20} className="relative z-10" /> 
-                            <span className="relative z-10">퇴근하기</span>
-                        </button>
-                    )}
-                    {isPending && (
-                        <button disabled className="w-full h-[56px] rounded-[18px] bg-zinc-100 dark:bg-white/5 text-zinc-400 font-bold text-[15px] cursor-not-allowed">
-                            확인 대기 중...
-                        </button>
-                    )}
+                {/* Action Buttons - Replaced with AttendancePanel */}
+                <div className="w-full z-10 mt-2">
+                    <AttendancePanel 
+                        user={currentUser} 
+                        className="!bg-transparent !shadow-none !border-none !p-0 !w-full" 
+                        hideHeader={true}
+                    />
                 </div>
           </div>
 

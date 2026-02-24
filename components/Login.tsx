@@ -142,7 +142,7 @@ const Login: React.FC<LoginProps> = ({ employees, onLogin, onManagerLogin }) => 
                       checked={rememberMe} 
                       onChange={(e) => setRememberMe(e.target.checked)} 
                       className="hidden" 
-                    />
+                      />
                     <span className="text-[12px] text-zinc-600 dark:text-zinc-400 font-medium select-none group-hover:text-zinc-900 dark:group-hover:text-zinc-200">자동 로그인</span>
                   </label>
                 </div>
@@ -199,7 +199,7 @@ const Login: React.FC<LoginProps> = ({ employees, onLogin, onManagerLogin }) => 
                       checked={rememberManager} 
                       onChange={(e) => setRememberManager(e.target.checked)} 
                       className="hidden" 
-                    />
+                      />
                     <span className="text-[12px] text-zinc-600 dark:text-zinc-400 font-medium select-none group-hover:text-zinc-900 dark:group-hover:text-zinc-200">자동 로그인</span>
                   </label>
                 </div>

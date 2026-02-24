@@ -43,7 +43,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
 
   // Form State
   const [formData, setFormData] = useState<Partial<Employee>>({
-    wage: { basic: 9860, responsibility: 0, incentive: 0, special: 0 }
+    wage: { basic: 10320, responsibility: 0, incentive: 0, special: 140 }
   });
 
   const filteredEmployees = useMemo(() => {
@@ -89,7 +89,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
     setFormData({
       branch: restrictedBranch || BranchCode.GDXC,
       position: EmployeeRank.CREW,
-      wage: { basic: 9860, responsibility: 0, incentive: 0, special: 0 },
+      wage: { basic: 10320, responsibility: 0, incentive: 0, special: 140 },
       isOnline: false,
       joinDate: new Date().toISOString().split('T')[0],
       isResigned: false
