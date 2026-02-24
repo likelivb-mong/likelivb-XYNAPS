@@ -43,13 +43,13 @@ const ApprovalRequests: React.FC<ApprovalRequestsProps> = ({ requests, onAction,
             <div className="flex bg-black/5 dark:bg-white/10 p-1 rounded-full w-full md:w-auto">
                 <button 
                     onClick={() => setActiveTab('PENDING')}
-                    className={`flex-1 md:flex-none px-4 py-1.5 md:px-5 md:py-2 rounded-full text-[12px] md:text-[13px] font-semibold transition-all ${activeTab === 'PENDING' ? 'bg-white shadow-sm' : 'text-zinc-500'}`}
+                    className={`flex-1 md:flex-none px-4 py-1.5 md:px-5 md:py-2 rounded-full text-[12px] md:text-[13px] font-semibold transition-all ${activeTab === 'PENDING' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400'}`}
                 >
                     대기 중
                 </button>
                 <button 
                     onClick={() => setActiveTab('HISTORY')}
-                    className={`flex-1 md:flex-none px-4 py-1.5 md:px-5 md:py-2 rounded-full text-[12px] md:text-[13px] font-semibold transition-all ${activeTab === 'HISTORY' ? 'bg-white shadow-sm' : 'text-zinc-500'}`}
+                    className={`flex-1 md:flex-none px-4 py-1.5 md:px-5 md:py-2 rounded-full text-[12px] md:text-[13px] font-semibold transition-all ${activeTab === 'HISTORY' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400'}`}
                 >
                     처리 내역
                 </button>
@@ -59,9 +59,9 @@ const ApprovalRequests: React.FC<ApprovalRequestsProps> = ({ requests, onAction,
 
       {/* Branch Filter - Compact */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
-        <button onClick={() => setSelectedBranch('ALL')} className={`flex-shrink-0 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[12px] md:text-[13px] font-medium whitespace-nowrap border ${selectedBranch === 'ALL' ? 'bg-white border-white shadow-sm' : 'border-transparent hover:bg-black/5'}`}>전체</button>
+        <button onClick={() => setSelectedBranch('ALL')} className={`flex-shrink-0 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[12px] md:text-[13px] font-medium whitespace-nowrap border ${selectedBranch === 'ALL' ? 'bg-white dark:bg-zinc-700 border-white dark:border-zinc-600 shadow-sm text-zinc-900 dark:text-white' : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:bg-black/5 dark:hover:bg-white/10'}`}>전체</button>
         {Object.entries(BRANCH_NAMES).map(([code, name]) => (
-            <button key={code} onClick={() => setSelectedBranch(code as BranchCode)} className={`flex-shrink-0 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[12px] md:text-[13px] font-medium whitespace-nowrap border ${selectedBranch === code ? 'bg-white border-white shadow-sm' : 'border-transparent hover:bg-black/5'}`}>{name}</button>
+            <button key={code} onClick={() => setSelectedBranch(code as BranchCode)} className={`flex-shrink-0 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[12px] md:text-[13px] font-medium whitespace-nowrap border ${selectedBranch === code ? 'bg-white dark:bg-zinc-700 border-white dark:border-zinc-600 shadow-sm text-zinc-900 dark:text-white' : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:bg-black/5 dark:hover:bg-white/10'}`}>{name}</button>
         ))}
       </div>
       
@@ -109,23 +109,23 @@ const ApprovalRequests: React.FC<ApprovalRequestsProps> = ({ requests, onAction,
                     </div>
 
                     {activeTab === 'PENDING' ? (
-                        <div className="flex gap-2 w-full pt-2 border-t border-black/5">
+                        <div className="flex gap-2 w-full pt-2 border-t border-black/5 dark:border-white/10">
                             {isSubstitute && isSubPending ? (
-                                <div className="flex-1 py-2.5 rounded-[10px] bg-zinc-100 text-zinc-500 font-semibold text-[13px] flex items-center justify-center gap-2 cursor-default">
+                                <div className="flex-1 py-2.5 rounded-[10px] bg-zinc-100 dark:bg-white/10 text-zinc-500 dark:text-zinc-400 font-semibold text-[13px] flex items-center justify-center gap-2 cursor-default">
                                     <ArrowRightLeft size={14} /> 동료 수락 대기 중
                                 </div>
                             ) : (
                                 <>
-                                    <button onClick={() => onAction(req.id, 'REJECTED')} className="flex-1 py-2.5 rounded-[10px] bg-red-50 text-red-600 font-semibold text-[13px] hover:bg-red-100 transition-colors">반려</button>
-                                    <button onClick={() => onAction(req.id, 'APPROVED')} className="flex-1 py-2.5 rounded-[10px] bg-zinc-900 text-white font-semibold text-[13px] hover:bg-zinc-700 transition-colors shadow-lg shadow-black/10">
+                                    <button onClick={() => onAction(req.id, 'REJECTED')} className="flex-1 py-2.5 rounded-[10px] bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 font-semibold text-[13px] hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors">반려</button>
+                                    <button onClick={() => onAction(req.id, 'APPROVED')} className="flex-1 py-2.5 rounded-[10px] bg-zinc-900 dark:bg-white text-white dark:text-black font-semibold text-[13px] hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors shadow-lg shadow-black/10">
                                         {isSubstitute && isSubAccepted ? '최종 승인' : '승인'}
                                     </button>
                                 </>
                             )}
                         </div>
                     ) : (
-                        <div className="flex justify-end pt-2 border-t border-black/5">
-                            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${req.status === 'APPROVED' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                        <div className="flex justify-end pt-2 border-t border-black/5 dark:border-white/10">
+                            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${req.status === 'APPROVED' ? 'text-green-600 bg-green-50 dark:bg-green-500/20 dark:text-green-400' : 'text-red-600 bg-red-50 dark:bg-red-500/20 dark:text-red-400'}`}>
                                 {req.status === 'APPROVED' ? '승인됨' : '반려됨'}
                             </span>
                         </div>
