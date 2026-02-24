@@ -291,14 +291,36 @@ const CrewDashboard: React.FC<CrewDashboardProps> = ({
                     )}
                 </div>
 
-                {/* Action Buttons - Replaced with AttendancePanel */}
-                <div className="w-full z-10 mt-2">
-                    <AttendancePanel 
-                        user={currentUser} 
-                        className="!bg-transparent !shadow-none !border-none !p-0 !w-full" 
-                        hideHeader={true}
-                        attendanceData={attendanceData} // Pass attendanceData
-                    />
+                {/* Action Buttons */}
+                <div className="w-full z-10 mt-2 px-4">
+                    {!isWorking ? (
+                        <button 
+                            onClick={handleClockInClick}
+                            disabled={isPending}
+                            className={`w-full py-4 rounded-[16px] font-bold text-[16px] shadow-lg transform transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                                isPending 
+                                ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed dark:bg-white/5 dark:text-zinc-600'
+                                : 'bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
+                            }`}
+                        >
+                            {isPending ? (
+                                <>
+                                    <Clock size={20} className="animate-pulse" /> 승인 대기 중...
+                                </>
+                            ) : (
+                                <>
+                                    <Play size={20} fill="currentColor" /> 출근하기
+                                </>
+                            )}
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={handleClockOutClick}
+                            className="w-full py-4 rounded-[16px] bg-[#FF453A] hover:bg-red-600 text-white font-bold text-[16px] shadow-lg shadow-red-500/30 transform transition-all active:scale-95 flex items-center justify-center gap-2"
+                        >
+                            <Square size={20} fill="currentColor" /> 퇴근하기
+                        </button>
+                    )}
                 </div>
           </div>
 

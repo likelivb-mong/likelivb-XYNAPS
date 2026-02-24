@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { BranchCode, EmployeeRank } from '../types';
-import type { Employee, WageConfig } from '../types';
-import { Plus, Phone, Search, X, ChevronRight, Award, Wallet, KeyRound } from 'lucide-react';
+import type { Employee } from '../types';
+import { Plus, Phone, Search, X, ChevronRight, Award, Wallet, KeyRound, RotateCcw, Trash2 } from 'lucide-react';
 import { RANK_LABEL, BRANCH_NAMES } from '../constants';
 
 const BANK_OPTIONS = [
@@ -17,7 +17,7 @@ const BANK_OPTIONS = [
   '기타'
 ];
 
-type SortOption = 'REGISTRATION' | 'RANK' | 'NAME';
+type TabOption = 'ACTIVE' | 'RESIGNED';
 
 interface EmployeeManagementProps {
   employees: Employee[];
@@ -34,9 +34,9 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   restrictedBranch,
   readOnly = false 
 }) => {
+  const [activeTab, setActiveTab] = useState<TabOption>('ACTIVE');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBranch, setSelectedBranch] = useState<BranchCode | 'ALL'>(restrictedBranch || 'ALL');
-  const [sortOption, setSortOption] = useState<SortOption>('RANK');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -48,33 +48,29 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
 
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
+      // Tab Filter
+      if (activeTab === 'ACTIVE' && emp.isResigned) return false;
+      if (activeTab === 'RESIGNED' && !emp.isResigned) return false;
+
       // Branch Filter
       if (restrictedBranch && emp.branch !== restrictedBranch) return false;
       if (!restrictedBranch && selectedBranch !== 'ALL' && emp.branch !== selectedBranch) return false;
 
-      // Search Filter
+      // Search Filter (Name only)
       if (searchTerm) {
-        const lowerTerm = searchTerm.toLowerCase();
-        return (
-          emp.name.toLowerCase().includes(lowerTerm) ||
-          emp.phone.includes(lowerTerm) ||
-          RANK_LABEL[emp.position].includes(lowerTerm)
-        );
+        return emp.name.toLowerCase().includes(searchTerm.toLowerCase());
       }
       return true;
     }).sort((a, b) => {
-      if (sortOption === 'RANK') {
-        // Leader first
-        if (a.position === EmployeeRank.LEADER && b.position !== EmployeeRank.LEADER) return -1;
-        if (a.position !== EmployeeRank.LEADER && b.position === EmployeeRank.LEADER) return 1;
-        return a.name.localeCompare(b.name);
-      }
-      if (sortOption === 'REGISTRATION') {
-         return new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime();
-      }
+      // Leader first, then Name
+      if (a.position === EmployeeRank.LEADER && b.position !== EmployeeRank.LEADER) return -1;
+      if (a.position !== EmployeeRank.LEADER && b.position === EmployeeRank.LEADER) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [employees, selectedBranch, searchTerm, restrictedBranch, sortOption]);
+  }, [employees, selectedBranch, searchTerm, restrictedBranch, activeTab]);
+
+  // Count active employees only for the header message
+  const activeEmployeeCount = employees.filter(e => !e.isResigned).length;
 
   const handleEdit = (emp: Employee) => {
     if (readOnly) return;
@@ -127,13 +123,21 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
     }
   };
 
+  const handleRestore = (emp: Employee, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm(`${emp.name} 직원을 복원하시겠습니까?`)) {
+        const restoredEmp = { ...emp, isResigned: false };
+        onUpdateEmployee(restoredEmp);
+    }
+  };
+
   return (
     <div className="space-y-4 md:space-y-6 animate-fade-in pb-20 max-w-full overflow-hidden">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-black/5 dark:border-white/10 pb-4">
         <div>
            <h2 className="text-[20px] md:text-[34px] font-bold text-zinc-900 dark:text-white tracking-tight leading-none">직원 관리</h2>
-           <p className="text-[13px] text-zinc-500 mt-1">총 {filteredEmployees.length}명의 직원이 조회되었습니다.</p>
+           <p className="text-[13px] text-zinc-500 mt-1">총 {activeEmployeeCount}명의 직원이 근무 중입니다.</p>
         </div>
         
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -142,7 +146,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 <Search size={16} className="text-zinc-400" />
                 <input 
                   type="text" 
-                  placeholder="이름, 직급 검색"
+                  placeholder="이름 검색"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="bg-transparent border-none outline-none text-[13px] ml-2 w-full text-zinc-900 dark:text-white placeholder-zinc-400"
@@ -160,73 +164,124 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
         </div>
       </div>
 
-      {/* Filters */}
-      {!restrictedBranch && (
-        <div className="flex overflow-x-auto no-scrollbar pb-2 gap-2">
-            <button 
-                onClick={() => setSelectedBranch('ALL')}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-[13px] font-medium transition-all ${selectedBranch === 'ALL' ? 'bg-zinc-900 dark:bg-white text-white dark:text-black' : 'bg-white dark:bg-white/5 text-zinc-500 hover:bg-black/5'}`}
-            >
-                전체 지점
-            </button>
-            {Object.entries(BRANCH_NAMES).map(([code, name]) => (
+      {/* Tabs & Filters */}
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+          {/* Tabs */}
+          <div className="flex bg-zinc-100 dark:bg-white/5 p-1 rounded-xl">
+              <button
+                  onClick={() => setActiveTab('ACTIVE')}
+                  className={`px-4 py-1.5 rounded-lg text-[13px] font-bold transition-all ${activeTab === 'ACTIVE' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+              >
+                  근무자
+              </button>
+              <button
+                  onClick={() => setActiveTab('RESIGNED')}
+                  className={`px-4 py-1.5 rounded-lg text-[13px] font-bold transition-all ${activeTab === 'RESIGNED' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+              >
+                  퇴사자
+              </button>
+          </div>
+
+          {/* Branch Filter */}
+          {!restrictedBranch && (
+            <div className="flex overflow-x-auto no-scrollbar pb-1 gap-2 w-full md:w-auto">
                 <button 
-                    key={code}
-                    onClick={() => setSelectedBranch(code as BranchCode)}
-                    className={`flex-shrink-0 px-4 py-2 rounded-full text-[13px] font-medium transition-all ${selectedBranch === code ? 'bg-zinc-900 dark:bg-white text-white dark:text-black' : 'bg-white dark:bg-white/5 text-zinc-500 hover:bg-black/5'}`}
+                    onClick={() => setSelectedBranch('ALL')}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all border ${selectedBranch === 'ALL' ? 'bg-zinc-900 dark:bg-white text-white dark:text-black border-zinc-900 dark:border-white' : 'bg-transparent text-zinc-500 border-zinc-200 dark:border-white/10 hover:bg-black/5'}`}
                 >
-                    {name}
+                    전체
                 </button>
-            ))}
-        </div>
-      )}
+                {Object.entries(BRANCH_NAMES).map(([code, name]) => (
+                    <button 
+                        key={code}
+                        onClick={() => setSelectedBranch(code as BranchCode)}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all border ${selectedBranch === code ? 'bg-zinc-900 dark:bg-white text-white dark:text-black border-zinc-900 dark:border-white' : 'bg-transparent text-zinc-500 border-zinc-200 dark:border-white/10 hover:bg-black/5'}`}
+                    >
+                        {name}
+                    </button>
+                ))}
+            </div>
+          )}
+      </div>
 
-      {/* Employee List Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-         {filteredEmployees.map(emp => (
-             <div 
-                key={emp.id} 
-                onClick={() => handleEdit(emp)}
-                className={`apple-glass p-4 rounded-[20px] flex flex-col gap-3 group border border-transparent hover:border-black/5 dark:hover:border-white/10 transition-all cursor-pointer relative overflow-hidden ${emp.isResigned ? 'opacity-60 grayscale' : ''}`}
-             >
-                {emp.isResigned && (
-                    <div className="absolute top-3 right-3 bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold z-10">퇴사</div>
-                )}
-                
-                <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[16px] font-bold ${
-                             emp.position === EmployeeRank.LEADER ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
-                         }`}>
-                             {emp.name.charAt(0)}
-                         </div>
-                         <div>
-                             <h3 className="text-[15px] font-bold text-zinc-900 dark:text-white flex items-center gap-1">
-                                 {emp.name}
-                                 {emp.position === EmployeeRank.LEADER && <Award size={14} className="text-purple-500" />}
-                             </h3>
-                             <p className="text-[12px] text-zinc-500 flex items-center gap-1.5">
-                                 <span>{BRANCH_NAMES[emp.branch]}</span>
-                                 <span className="w-0.5 h-0.5 rounded-full bg-zinc-300"></span>
-                                 <span>{RANK_LABEL[emp.position]}</span>
-                             </p>
-                         </div>
-                    </div>
-                    {!readOnly && <ChevronRight size={18} className="text-zinc-300 group-hover:text-zinc-500 transition-colors" />}
-                </div>
-
-                <div className="bg-zinc-50 dark:bg-white/5 rounded-[12px] p-3 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between text-[12px]">
-                         <span className="text-zinc-400 flex items-center gap-1"><Phone size={12} /> 연락처</span>
-                         <span className="text-zinc-700 dark:text-zinc-300 font-mono">{emp.phone}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[12px]">
-                         <span className="text-zinc-400 flex items-center gap-1"><Wallet size={12} /> 기본급</span>
-                         <span className="text-zinc-700 dark:text-zinc-300 font-mono">₩{emp.wage.basic.toLocaleString()}</span>
-                    </div>
-                </div>
-             </div>
-         ))}
+      {/* Employee List (Board/Table Form) */}
+      <div className="apple-glass rounded-[20px] overflow-hidden border border-black/5 dark:border-white/10">
+         <table className="w-full text-left border-collapse">
+             <thead className="bg-zinc-50/50 dark:bg-white/5 border-b border-black/5 dark:border-white/5 text-[12px] text-zinc-500 uppercase tracking-wider">
+                 <tr>
+                     <th className="px-6 py-4 font-medium">이름 / 직급</th>
+                     <th className="px-6 py-4 font-medium">연락처</th>
+                     <th className="px-6 py-4 font-medium hidden md:table-cell">지점</th>
+                     <th className="px-6 py-4 font-medium hidden md:table-cell">입사일</th>
+                     <th className="px-6 py-4 font-medium text-right">관리</th>
+                 </tr>
+             </thead>
+             <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                 {filteredEmployees.length === 0 ? (
+                     <tr>
+                         <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 text-[13px]">
+                             조회된 직원이 없습니다.
+                         </td>
+                     </tr>
+                 ) : (
+                     filteredEmployees.map(emp => (
+                         <tr 
+                            key={emp.id} 
+                            onClick={() => handleEdit(emp)}
+                            className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors cursor-pointer group"
+                         >
+                             <td className="px-6 py-4">
+                                 <div className="flex flex-col">
+                                     <div className="flex items-center gap-1.5">
+                                         <span className="text-[15px] font-bold text-zinc-900 dark:text-white">
+                                             {emp.name}
+                                         </span>
+                                         {emp.position === EmployeeRank.LEADER && <Award size={14} className="text-purple-500" />}
+                                     </div>
+                                     <span className="text-[11px] text-zinc-500 mt-0.5">
+                                         {RANK_LABEL[emp.position]}
+                                         <span className="md:hidden"> • {BRANCH_NAMES[emp.branch]}</span>
+                                     </span>
+                                 </div>
+                             </td>
+                             <td className="px-6 py-4">
+                                 <a 
+                                    href={`tel:${emp.phone}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex items-center gap-1.5 text-[13px] font-medium text-zinc-600 dark:text-zinc-300 hover:text-blue-500 dark:hover:text-blue-400 transition-colors w-fit px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                 >
+                                     <Phone size={14} />
+                                     {emp.phone}
+                                 </a>
+                             </td>
+                             <td className="px-6 py-4 hidden md:table-cell">
+                                 <span className="text-[13px] text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-white/10 px-2.5 py-1 rounded-full">
+                                     {BRANCH_NAMES[emp.branch]}
+                                 </span>
+                             </td>
+                             <td className="px-6 py-4 hidden md:table-cell">
+                                 <span className="text-[13px] text-zinc-500 font-mono">
+                                     {emp.joinDate}
+                                 </span>
+                             </td>
+                             <td className="px-6 py-4 text-right">
+                                 {activeTab === 'RESIGNED' ? (
+                                     <button 
+                                        onClick={(e) => handleRestore(emp, e)}
+                                        className="p-2 rounded-full hover:bg-green-100 text-green-600 dark:hover:bg-green-900/20 dark:text-green-400 transition-colors"
+                                        title="복원"
+                                     >
+                                         <RotateCcw size={18} />
+                                     </button>
+                                 ) : (
+                                     <ChevronRight size={18} className="text-zinc-300 group-hover:text-zinc-500 transition-colors inline-block" />
+                                 )}
+                             </td>
+                         </tr>
+                     ))
+                 )}
+             </tbody>
+         </table>
       </div>
 
       {/* Add/Edit Modal */}
@@ -411,11 +466,12 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
 
                   {/* Footer */}
                   <div className="px-6 py-4 border-t border-black/5 dark:border-white/5 flex gap-3 bg-zinc-50/50 dark:bg-white/5 shrink-0">
-                      {editingEmployee && (
+                      {editingEmployee && !editingEmployee.isResigned && (
                            <button 
                              onClick={handleDelete}
-                             className="px-4 py-2.5 rounded-[12px] bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 font-bold text-[13px] hover:bg-red-200 transition-colors"
+                             className="px-4 py-2.5 rounded-[12px] bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 font-bold text-[13px] hover:bg-red-200 transition-colors flex items-center gap-2"
                            >
+                               <Trash2 size={16} />
                                퇴사 처리
                            </button>
                       )}
