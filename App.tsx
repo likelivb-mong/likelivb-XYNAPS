@@ -155,13 +155,13 @@ const App: React.FC = () => {
   const handleRequestSubmit = async (request: ApprovalRequest) => {
     setApprovalRequests(prev => [request, ...prev]);
     const { error } = await supabase.from('approval_requests').insert([request]);
-    if (error) console.error('Supabase Error:', error);
+    if (error) console.debug('Supabase Error:', error);
   };
 
   const handleRequestCancel = async (id: string) => {
       setApprovalRequests(prev => prev.filter(req => req.id !== id));
       const { error } = await supabase.from('approval_requests').delete().eq('id', id);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleCrewSubstituteResponse = async (id: string, accepted: boolean) => {
@@ -181,13 +181,13 @@ const App: React.FC = () => {
     }));
 
     const { error } = await supabase.from('approval_requests').update(updates).eq('id', id);
-    if (error) console.error('Supabase Error:', error);
+    if (error) console.debug('Supabase Error:', error);
   };
 
   const handleDirectClockIn = async (record: AttendanceRecord) => {
     setAttendanceRecords(prev => [...prev, record]);
     const { error } = await supabase.from('attendance_records').insert([record]);
-    if (error) console.error('Supabase Error:', error);
+    if (error) console.debug('Supabase Error:', error);
   };
 
   const handleDirectClockOut = async (recordId: string, endTime: string) => {
@@ -213,19 +213,19 @@ const App: React.FC = () => {
           status: AttendanceStatus.OFF_WORK,
           accumulatedMinutes: diffMinutes // We should probably recalculate or send this
       }).eq('id', recordId);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
   
   const handleUpdateAttendance = async (updatedRecord: AttendanceRecord) => {
       setAttendanceRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
       const { error } = await supabase.from('attendance_records').update(updatedRecord).eq('id', updatedRecord.id);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleDeleteAttendance = async (recordId: string) => {
       setAttendanceRecords(prev => prev.filter(r => r.id !== recordId));
       const { error } = await supabase.from('attendance_records').delete().eq('id', recordId);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleApprovalAction = async (id: string, action: 'APPROVED' | 'REJECTED' | 'PENDING') => {
@@ -300,32 +300,32 @@ const App: React.FC = () => {
   const handleAddSchedules = async (newSchedules: Schedule[]) => {
       setSchedules(prev => [...prev, ...newSchedules]);
       const { error } = await supabase.from('schedules').insert(newSchedules);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleUpdateSchedule = async (schedule: Schedule) => {
       setSchedules(prev => prev.map(s => s.id === schedule.id ? schedule : s));
       const { error } = await supabase.from('schedules').update(schedule).eq('id', schedule.id);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleDeleteSchedule = async (scheduleId: string) => {
       setSchedules(prev => prev.filter(s => s.id !== scheduleId));
       const { error } = await supabase.from('schedules').delete().eq('id', scheduleId);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   // Employee Handlers
   const handleAddEmployee = async (employee: Employee) => {
       setEmployees(prev => [...prev, employee]);
       const { error } = await supabase.from('employees').insert([employee]);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleUpdateEmployee = async (employee: Employee) => {
       setEmployees(prev => prev.map(e => e.id === employee.id ? employee : e));
       const { error } = await supabase.from('employees').update(employee).eq('id', employee.id);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleDeleteEmployee = async (employeeId: string) => {
