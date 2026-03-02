@@ -106,7 +106,17 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       const updatedEmployee = { ...editingEmployee, ...formData } as Employee;
       onUpdateEmployee(updatedEmployee);
     } else {
-      // Create
+      // Create - Check if phone number already exists (resigned or not)
+      const existingEmployee = employees.find(e => e.phone === formData.phone);
+      if (existingEmployee) {
+        if (existingEmployee.isResigned) {
+          alert('이 전화번호로 등록된 계정이 퇴사 처리되어 있습니다. 관리자에게 문의해 주세요.');
+        } else {
+          alert('이미 등록된 전화번호입니다.');
+        }
+        return;
+      }
+
       const newEmployee: Employee = {
         ...formData as Employee,
         id: `emp-${Date.now()}`,
