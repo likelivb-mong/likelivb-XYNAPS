@@ -328,6 +328,17 @@ const App: React.FC = () => {
       if (error) console.error('Supabase Error:', error);
   };
 
+  const handleDeleteEmployee = async (employeeId: string) => {
+      setEmployees(prev => prev.filter(e => e.id !== employeeId));
+      const { error } = await supabase.from('employees').delete().eq('id', employeeId);
+      if (error) {
+          console.error('Supabase Error:', error);
+          alert('삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      } else {
+          alert('직원이 영구삭제되었습니다.');
+      }
+  };
+
   const renderContent = () => {
     if (userRole === UserRole.MANAGER) {
       switch (activeTab) {
@@ -347,10 +358,11 @@ const App: React.FC = () => {
                     onDeleteSchedule={handleDeleteSchedule}
                  />;
         case 'employees':
-          return <EmployeeManagement 
-                    employees={employees} 
+          return <EmployeeManagement
+                    employees={employees}
                     onAddEmployee={handleAddEmployee}
                     onUpdateEmployee={handleUpdateEmployee}
+                    onDeleteEmployee={handleDeleteEmployee}
                  />;
         case 'payroll':
           return <Payroll attendanceData={attendanceRecords} approvalRequests={approvalRequests} />;
@@ -388,12 +400,13 @@ const App: React.FC = () => {
             onDeleteSchedule={handleDeleteSchedule}
           />;
         case 'employees':
-          return <EmployeeManagement 
-            employees={employees} 
+          return <EmployeeManagement
+            employees={employees}
             onAddEmployee={handleAddEmployee}
             onUpdateEmployee={handleUpdateEmployee}
+            onDeleteEmployee={handleDeleteEmployee}
             restrictedBranch={currentUser!.branch}
-            readOnly={true} 
+            readOnly={true}
           />;
         case 'payroll':
           return <Payroll isCrewMode={true} currentUser={currentUser!} attendanceData={attendanceRecords} approvalRequests={approvalRequests} />;
