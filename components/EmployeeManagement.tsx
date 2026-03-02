@@ -23,16 +23,18 @@ interface EmployeeManagementProps {
   employees: Employee[];
   onAddEmployee: (employee: Employee) => void;
   onUpdateEmployee: (employee: Employee) => void;
+  onDeleteEmployee?: (employeeId: string) => void;
   restrictedBranch?: BranchCode;
   readOnly?: boolean;
 }
 
-const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ 
-  employees, 
+const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
+  employees,
   onAddEmployee,
   onUpdateEmployee,
+  onDeleteEmployee,
   restrictedBranch,
-  readOnly = false 
+  readOnly = false
 }) => {
   const [activeTab, setActiveTab] = useState<TabOption>('ACTIVE');
   const [searchTerm, setSearchTerm] = useState('');
@@ -119,6 +121,14 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
     if (confirm('정말 퇴사 처리하시겠습니까?')) {
         const resignedEmp = { ...editingEmployee, isResigned: true } as Employee;
         onUpdateEmployee(resignedEmp);
+        setIsModalOpen(false);
+    }
+  };
+
+  const handlePermanentDelete = () => {
+    if (!editingEmployee || !onDeleteEmployee) return;
+    if (confirm(`${editingEmployee.name} 직원을 영구삭제 하시겠습니까?\n(이 작업은 되돌릴 수 없습니다)`)) {
+        onDeleteEmployee(editingEmployee.id);
         setIsModalOpen(false);
     }
   };
@@ -467,22 +477,31 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                   {/* Footer */}
                   <div className="px-6 py-4 border-t border-black/5 dark:border-white/5 flex gap-3 bg-zinc-50/50 dark:bg-white/5 shrink-0">
                       {editingEmployee && !editingEmployee.isResigned && (
-                           <button 
+                           <button
                              onClick={handleDelete}
-                             className="px-4 py-2.5 rounded-[12px] bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 font-bold text-[13px] hover:bg-red-200 transition-colors flex items-center gap-2"
+                             className="px-4 py-2.5 rounded-[12px] bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 font-bold text-[13px] hover:bg-orange-200 transition-colors flex items-center gap-2"
                            >
                                <Trash2 size={16} />
                                퇴사 처리
                            </button>
                       )}
+                      {editingEmployee && editingEmployee.isResigned && onDeleteEmployee && (
+                           <button
+                             onClick={handlePermanentDelete}
+                             className="px-4 py-2.5 rounded-[12px] bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 font-bold text-[13px] hover:bg-red-200 transition-colors flex items-center gap-2"
+                           >
+                               <Trash2 size={16} />
+                               영구삭제
+                           </button>
+                      )}
                       <div className="flex-1"></div>
-                      <button 
+                      <button
                         onClick={() => setIsModalOpen(false)}
                         className="px-5 py-2.5 rounded-[12px] bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-bold text-[13px] hover:bg-zinc-300 transition-colors"
                       >
                           취소
                       </button>
-                      <button 
+                      <button
                         onClick={handleSave}
                         className="px-6 py-2.5 rounded-[12px] bg-zinc-900 dark:bg-white text-white dark:text-black font-bold text-[13px] shadow-lg hover:scale-105 transition-transform"
                       >
