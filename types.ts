@@ -24,6 +24,7 @@ export enum AttendanceStatus {
   OFF_WORK = 'OFF',
   BREAK = 'BREAK',
   PENDING_APPROVAL = 'PENDING', // 승인 대기 중
+  FORCE_STOPPED = 'FORCE_STOPPED', // 근무정지 (관리자가 강제 퇴근 처리)
 }
 
 export enum AttendanceTag {

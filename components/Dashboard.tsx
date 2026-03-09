@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { RANK_LABEL } from '../constants';
 import { BranchCode, AttendanceStatus, AttendanceRecord, Schedule, Employee } from '../types';
-import { MapPin, Activity, Sparkles, TrendingUp, Sun, CalendarClock, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MapPin, Activity, Sparkles, TrendingUp, Sun, CalendarClock, LogOut, ChevronLeft, ChevronRight, OctagonX } from 'lucide-react';
 import { generateWorkforceInsight } from '../services/geminiService';
 
 interface DashboardProps {
     attendanceData: AttendanceRecord[];
     schedules: Schedule[];
     employees: Employee[];
+    onForceStop?: (recordId: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ attendanceData, schedules, employees }) => {
+const Dashboard: React.FC<DashboardProps> = ({ attendanceData, schedules, employees, onForceStop }) => {
   const attendance = attendanceData;
   
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -204,6 +205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceData, schedules, employ
 
                 mergedData.sort((a, b) => {
                     const statusWeight = (item: any) => {
+                        if (item.record?.status === AttendanceStatus.FORCE_STOPPED) return 0;
                         if (item.record?.status === AttendanceStatus.WORKING) return 1;
                         if (item.record?.status === AttendanceStatus.OFF_WORK) return 2;
                         if (item.schedule) return 3;
@@ -241,6 +243,7 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceData, schedules, employ
                            mergedData.map(({ emp, schedule, record }) => {
                               const isWorking = record?.status === AttendanceStatus.WORKING;
                               const isOff = record?.status === AttendanceStatus.OFF_WORK;
+                              const isForceStopped = record?.status === AttendanceStatus.FORCE_STOPPED;
                               
                               const clockInTime = record ? new Date(record.clockIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
                               const clockOutTime = record?.clockOut ? new Date(record.clockOut).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
@@ -251,7 +254,7 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceData, schedules, employ
                                    
                                    {/* Name & Role */}
                                    <div className="flex items-center gap-2 md:gap-3 w-[100px] md:min-w-[100px] shrink-0">
-                                      <div className={`relative w-2 h-2 md:w-2.5 md:h-2.5 rounded-full shrink-0 ${isWorking ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : isOff ? 'bg-zinc-400 dark:bg-zinc-600' : 'bg-transparent border border-zinc-300 dark:border-zinc-600'}`}></div>
+                                      <div className={`relative w-2 h-2 md:w-2.5 md:h-2.5 rounded-full shrink-0 ${isWorking ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : isForceStopped ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]' : isOff ? 'bg-zinc-400 dark:bg-zinc-600' : 'bg-transparent border border-zinc-300 dark:border-zinc-600'}`}></div>
                                       <div className="truncate">
                                          <p className="text-[13px] md:text-[15px] font-bold text-zinc-900 dark:text-zinc-200 leading-tight truncate">{emp.name}</p>
                                          <p className="text-[10px] md:text-[11px] text-zinc-500 font-medium truncate">{RANK_LABEL[emp.position]}</p>
@@ -272,7 +275,7 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceData, schedules, employ
                                                      <span className="text-zinc-400 text-[9px] md:text-[10px]">IN</span>
                                                      {clockInTime}
                                                  </div>
-                                                 {isOff && (
+                                                 {(isOff || isForceStopped) && (
                                                      <div className="flex items-center gap-1">
                                                          <span className="text-zinc-400 text-[9px] md:text-[10px]">OUT</span>
                                                          {clockOutTime}
@@ -288,14 +291,26 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceData, schedules, employ
                                    {/* Timer/Status */}
                                    <div className="text-right w-[70px] md:min-w-[90px] shrink-0">
                                       {isWorking ? (
-                                        <div className="flex flex-col items-end">
+                                        <div className="flex flex-col items-end gap-1">
                                            <div className="text-[13px] md:text-[16px] font-mono font-bold text-green-600 dark:text-green-400 tracking-tight leading-none">
                                               {getElapsedTimeString(record!.clockIn)}
                                            </div>
-                                           <div className="text-[9px] md:text-[10px] text-green-600/70 dark:text-green-400/70 font-medium mt-0.5 flex items-center gap-1 animate-pulse">
+                                           <div className="text-[9px] md:text-[10px] text-green-600/70 dark:text-green-400/70 font-medium flex items-center gap-1 animate-pulse">
                                                <Activity size={10} /> <span className="hidden md:inline">근무 중</span>
                                            </div>
+                                           {onForceStop && (
+                                             <button
+                                               onClick={() => onForceStop(record!.id)}
+                                               className="text-[9px] md:text-[10px] font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 transition-colors"
+                                             >
+                                               <OctagonX size={10} /> 근무정지
+                                             </button>
+                                           )}
                                         </div>
+                                      ) : isForceStopped ? (
+                                        <span className="text-[10px] md:text-[11px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 w-fit ml-auto">
+                                          <OctagonX size={10} /> 근무정지
+                                        </span>
                                       ) : isOff ? (
                                         <span className="text-[10px] md:text-[11px] font-medium text-zinc-500 bg-zinc-200/50 dark:bg-zinc-800 px-2 py-0.5 rounded-full flex items-center gap-1 w-fit ml-auto">
                                           <LogOut size={10} /> 퇴근

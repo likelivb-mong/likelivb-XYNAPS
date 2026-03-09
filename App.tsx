@@ -215,7 +215,33 @@ const App: React.FC = () => {
       }).eq('id', recordId);
       if (error) console.debug('Supabase Error:', error);
   };
-  
+
+  const handleForceStop = async (recordId: string) => {
+      const now = new Date().toISOString();
+      let diffMinutes = 0;
+      setAttendanceRecords(prev => prev.map(rec => {
+        if (rec.id === recordId) {
+            const start = new Date(rec.clockIn).getTime();
+            const end = new Date(now).getTime();
+            diffMinutes = Math.max(0, Math.floor((end - start) / (1000 * 60)));
+            return {
+                ...rec,
+                status: AttendanceStatus.FORCE_STOPPED,
+                clockOut: now,
+                accumulatedMinutes: diffMinutes
+            };
+        }
+        return rec;
+      }));
+
+      const { error } = await supabase.from('attendance_records').update({
+          clockOut: now,
+          status: AttendanceStatus.FORCE_STOPPED,
+          accumulatedMinutes: diffMinutes
+      }).eq('id', recordId);
+      if (error) console.debug('Supabase Error:', error);
+  };
+
   const handleUpdateAttendance = async (updatedRecord: AttendanceRecord) => {
       setAttendanceRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
       const { error } = await supabase.from('attendance_records').update(updatedRecord).eq('id', updatedRecord.id);
@@ -263,11 +289,15 @@ const App: React.FC = () => {
                  const end = new Date(targetRequest.endTime).getTime();
                  newMinutes = Math.floor((end - start) / (1000 * 60));
              }
+             // 근무정지 상태인 경우 승인 시 퇴근 처리
+             const resolvedStatus = existing.status === AttendanceStatus.FORCE_STOPPED
+                 ? AttendanceStatus.OFF_WORK
+                 : (targetRequest.endTime ? AttendanceStatus.OFF_WORK : existing.status);
              const updated = {
                  ...existing,
                  clockIn: targetRequest.startTime || existing.clockIn,
                  clockOut: targetRequest.endTime || existing.clockOut,
-                 status: targetRequest.endTime ? AttendanceStatus.OFF_WORK : existing.status,
+                 status: resolvedStatus,
                  accumulatedMinutes: newMinutes,
                  tag: AttendanceTag.NORMAL
              };
@@ -332,7 +362,7 @@ const App: React.FC = () => {
       setEmployees(prev => prev.filter(e => e.id !== employeeId));
       const { error } = await supabase.from('employees').delete().eq('id', employeeId);
       if (error) {
-          console.error('Supabase Error:', error);
+          console.debug('Supabase Error:', error);
           alert('삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
       } else {
           alert('직원이 영구삭제되었습니다.');
@@ -343,7 +373,7 @@ const App: React.FC = () => {
     if (userRole === UserRole.MANAGER) {
       switch (activeTab) {
         case 'dashboard':
-          return <Dashboard attendanceData={attendanceRecords} schedules={schedules} employees={employees} />;
+          return <Dashboard attendanceData={attendanceRecords} schedules={schedules} employees={employees} onForceStop={handleForceStop} />;
         case 'schedule':
           return <ScheduleCalendar 
                     currentUser={currentUser!} 
@@ -369,20 +399,21 @@ const App: React.FC = () => {
         case 'approvals':
           return <ApprovalRequests requests={approvalRequests} onAction={handleApprovalAction} employees={employees} />;
         default:
-          return <Dashboard attendanceData={attendanceRecords} schedules={schedules} employees={employees} />;
+          return <Dashboard attendanceData={attendanceRecords} schedules={schedules} employees={employees} onForceStop={handleForceStop} />;
       }
     } else {
       // Crew Mode Routes
       switch (activeTab) {
         case 'dashboard':
-          return <CrewDashboard 
-            currentUser={currentUser!} 
+          return <CrewDashboard
+            currentUser={currentUser!}
             attendanceData={attendanceRecords}
             approvalRequests={approvalRequests}
             onRequestClockIn={handleRequestSubmit}
             onDirectClockIn={handleDirectClockIn}
             onDirectClockOut={handleDirectClockOut}
             onNavigateToSchedule={() => setActiveTab('schedule')}
+            onNavigate={(tab) => setActiveTab(tab)}
             schedules={schedules}
           />;
         case 'schedule':
@@ -420,14 +451,15 @@ const App: React.FC = () => {
         case 'notifications':
           return <CrewNotifications currentUser={currentUser!} requests={approvalRequests} onSubstituteAction={handleCrewSubstituteResponse} employees={employees} />;
         default:
-          return <CrewDashboard 
-            currentUser={currentUser!} 
+          return <CrewDashboard
+            currentUser={currentUser!}
             attendanceData={attendanceRecords}
             approvalRequests={approvalRequests}
             onRequestClockIn={handleRequestSubmit}
             onDirectClockIn={handleDirectClockIn}
             onDirectClockOut={handleDirectClockOut}
             onNavigateToSchedule={() => setActiveTab('schedule')}
+            onNavigate={(tab) => setActiveTab(tab)}
             schedules={schedules}
           />;
       }
