@@ -209,7 +209,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, userR
   );
 
   return (
-    <div className="min-h-screen flex bg-background text-zinc-900 dark:text-zinc-100 font-sans selection:bg-primary/30 transition-colors duration-300 text-[14px] overflow-hidden">
+    <div className="min-h-screen flex bg-background text-zinc-900 dark:text-zinc-100 font-sans selection:bg-primary/30 transition-colors duration-300 text-[14px]">
       {/* Sidebar - macOS Style */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-[280px] apple-sidebar transform transition-transform duration-300 ease-out lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col pt-10 pb-6 px-6">
@@ -336,7 +336,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, userR
         </div>
 
         {/* Reduced padding on mobile (p-3) vs desktop (p-10) */}
-        <div className="flex-1 p-3 lg:p-10 max-w-[1440px] w-full mx-auto min-w-0">
+        <div className="flex-1 p-3 lg:p-10 max-w-[1440px] w-full mx-auto min-w-0 overflow-y-auto">
           {children}
         </div>
       </main>
