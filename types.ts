@@ -102,4 +102,5 @@ export interface ApprovalRequest {
   endTime?: string; // ISO string, used for CORRECTION requests
   substituteId?: string; // 대타 요청 시 대상 직원 ID
   substituteStatus?: 'PENDING' | 'ACCEPTED' | 'REJECTED'; // 대타 요청 받은 직원의 수락 상태
+  previousRecordSnapshot?: string; // JSON snapshot of attendance record before approval (for undo)
 }

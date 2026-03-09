@@ -257,14 +257,16 @@ const App: React.FC = () => {
   const handleApprovalAction = async (id: string, action: 'APPROVED' | 'REJECTED' | 'PENDING') => {
     const targetRequest = approvalRequests.find(r => r.id === id);
     if (!targetRequest) return;
-    
-    // 1. Update Request
-    setApprovalRequests(prev => prev.map(req => req.id === id ? { ...req, status: action } : req));
-    await supabase.from('approval_requests').update({ status: action }).eq('id', id);
 
-    if (action !== 'APPROVED') return;
+    if (action !== 'APPROVED') {
+        setApprovalRequests(prev => prev.map(req => req.id === id ? { ...req, status: action } : req));
+        await supabase.from('approval_requests').update({ status: action }).eq('id', id);
+        return;
+    }
 
-    // 2. Side Effects (Create Attendance Records)
+    // 2. Side Effects (Create/Update Attendance Records)
+    let snapshot: string | undefined = undefined;
+
     if (targetRequest.type === 'CLOCK_IN') {
         const newRecord: AttendanceRecord = {
             id: `att-req-${id}`,
@@ -277,19 +279,21 @@ const App: React.FC = () => {
         };
         setAttendanceRecords(prev => [...prev, newRecord]);
         await supabase.from('attendance_records').insert([newRecord]);
+        // snapshot: null means "created new record" — undo = delete
+        snapshot = JSON.stringify({ action: 'CREATED', recordId: newRecord.id });
 
     } else if (targetRequest.type === 'CORRECTION') {
-        // ... (Similar logic for correction, update existing record or create new)
-        // Simplified for brevity - assumes logic mirrors original but calls Supabase
         const existing = attendanceRecords.find(r => r.employeeId === targetRequest.employeeId && r.date === targetRequest.targetDate);
         if (existing) {
+             // Save snapshot BEFORE update for undo
+             snapshot = JSON.stringify({ action: 'UPDATED', record: existing });
+
              let newMinutes = existing.accumulatedMinutes;
              if (targetRequest.startTime && targetRequest.endTime) {
                  const start = new Date(targetRequest.startTime).getTime();
                  const end = new Date(targetRequest.endTime).getTime();
                  newMinutes = Math.floor((end - start) / (1000 * 60));
              }
-             // 근무정지 상태인 경우 승인 시 퇴근 처리
              const resolvedStatus = existing.status === AttendanceStatus.FORCE_STOPPED
                  ? AttendanceStatus.OFF_WORK
                  : (targetRequest.endTime ? AttendanceStatus.OFF_WORK : existing.status);
@@ -322,8 +326,40 @@ const App: React.FC = () => {
             };
             setAttendanceRecords(prev => [...prev, newRecord]);
             await supabase.from('attendance_records').insert([newRecord]);
+            snapshot = JSON.stringify({ action: 'CREATED', recordId: newRecord.id });
         }
     }
+
+    // 1. Update Request status + save snapshot
+    const updatedReq = { status: 'APPROVED' as const, previousRecordSnapshot: snapshot };
+    setApprovalRequests(prev => prev.map(req => req.id === id ? { ...req, ...updatedReq } : req));
+    await supabase.from('approval_requests').update(updatedReq).eq('id', id);
+  };
+
+  const handleUndoApproval = async (id: string) => {
+    const targetRequest = approvalRequests.find(r => r.id === id);
+    if (!targetRequest || targetRequest.status !== 'APPROVED') return;
+
+    // 1. Revert attendance record
+    if (targetRequest.previousRecordSnapshot) {
+        const snap = JSON.parse(targetRequest.previousRecordSnapshot) as
+            | { action: 'CREATED'; recordId: string }
+            | { action: 'UPDATED'; record: AttendanceRecord };
+
+        if (snap.action === 'CREATED') {
+            setAttendanceRecords(prev => prev.filter(r => r.id !== snap.recordId));
+            await supabase.from('attendance_records').delete().eq('id', snap.recordId);
+        } else if (snap.action === 'UPDATED') {
+            setAttendanceRecords(prev => prev.map(r => r.id === snap.record.id ? snap.record : r));
+            await supabase.from('attendance_records').update(snap.record).eq('id', snap.record.id);
+        }
+    }
+
+    // 2. Revert request to PENDING
+    setApprovalRequests(prev => prev.map(req =>
+        req.id === id ? { ...req, status: 'PENDING', previousRecordSnapshot: undefined } : req
+    ));
+    await supabase.from('approval_requests').update({ status: 'PENDING', previousRecordSnapshot: null }).eq('id', id);
   };
 
   // Schedule Handlers
@@ -397,7 +433,7 @@ const App: React.FC = () => {
         case 'payroll':
           return <Payroll attendanceData={attendanceRecords} approvalRequests={approvalRequests} />;
         case 'approvals':
-          return <ApprovalRequests requests={approvalRequests} onAction={handleApprovalAction} employees={employees} />;
+          return <ApprovalRequests requests={approvalRequests} onAction={handleApprovalAction} onUndoApproval={handleUndoApproval} employees={employees} />;
         default:
           return <Dashboard attendanceData={attendanceRecords} schedules={schedules} employees={employees} onForceStop={handleForceStop} />;
       }
