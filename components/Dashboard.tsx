@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { RANK_LABEL } from '../constants';
 import { BranchCode, AttendanceStatus, AttendanceRecord, Schedule, Employee } from '../types';
-import { MapPin, Activity, Sparkles, TrendingUp, Sun, CalendarClock, LogOut, ChevronLeft, ChevronRight, OctagonX } from 'lucide-react';
+import { MapPin, Activity, Sparkles, TrendingUp, Sun, CalendarClock, LogOut, ChevronLeft, ChevronRight, OctagonX, RotateCcw } from 'lucide-react';
 import { generateWorkforceInsight } from '../services/geminiService';
 
 interface DashboardProps {
@@ -308,9 +308,19 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceData, schedules, employ
                                            )}
                                         </div>
                                       ) : isForceStopped ? (
-                                        <span className="text-[10px] md:text-[11px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 w-fit ml-auto">
-                                          <OctagonX size={10} /> 근무정지
-                                        </span>
+                                        <div className="flex flex-col items-end gap-1">
+                                          <span className="text-[10px] md:text-[11px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                                            <OctagonX size={10} /> 근무정지
+                                          </span>
+                                          {onForceStop && (
+                                            <button
+                                              onClick={() => onForceStop(record!.id)}
+                                              className="text-[9px] md:text-[10px] font-bold text-blue-500 bg-blue-500/10 hover:bg-blue-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 transition-colors"
+                                            >
+                                              <RotateCcw size={10} /> 취소
+                                            </button>
+                                          )}
+                                        </div>
                                       ) : isOff ? (
                                         <span className="text-[10px] md:text-[11px] font-medium text-zinc-500 bg-zinc-200/50 dark:bg-zinc-800 px-2 py-0.5 rounded-full flex items-center gap-1 w-fit ml-auto">
                                           <LogOut size={10} /> 퇴근

@@ -217,27 +217,41 @@ const App: React.FC = () => {
   };
 
   const handleForceStop = async (recordId: string) => {
-      const now = new Date().toISOString();
-      let diffMinutes = 0;
-      setAttendanceRecords(prev => prev.map(rec => {
-        if (rec.id === recordId) {
-            const start = new Date(rec.clockIn).getTime();
-            const end = new Date(now).getTime();
-            diffMinutes = Math.max(0, Math.floor((end - start) / (1000 * 60)));
-            return {
-                ...rec,
-                status: AttendanceStatus.FORCE_STOPPED,
-                clockOut: now,
-                accumulatedMinutes: diffMinutes
-            };
-        }
-        return rec;
-      }));
+      const record = attendanceRecords.find(r => r.id === recordId);
+      if (!record) return;
+
+      const isForceStopped = record.status === AttendanceStatus.FORCE_STOPPED;
+      let updatedRecord = { ...record };
+
+      if (isForceStopped) {
+          // Toggle OFF: 근무정지 취소 → WORKING 상태로 복귀
+          updatedRecord = {
+              ...record,
+              status: AttendanceStatus.WORKING,
+              clockOut: undefined,
+              accumulatedMinutes: record.accumulatedMinutes // Keep accumulated minutes
+          };
+      } else {
+          // Toggle ON: WORKING → FORCE_STOPPED
+          const now = new Date().toISOString();
+          const start = new Date(record.clockIn).getTime();
+          const end = new Date(now).getTime();
+          const diffMinutes = Math.max(0, Math.floor((end - start) / (1000 * 60)));
+
+          updatedRecord = {
+              ...record,
+              status: AttendanceStatus.FORCE_STOPPED,
+              clockOut: now,
+              accumulatedMinutes: diffMinutes
+          };
+      }
+
+      setAttendanceRecords(prev => prev.map(r => r.id === recordId ? updatedRecord : r));
 
       const { error } = await supabase.from('attendance_records').update({
-          clockOut: now,
-          status: AttendanceStatus.FORCE_STOPPED,
-          accumulatedMinutes: diffMinutes
+          status: updatedRecord.status,
+          clockOut: updatedRecord.clockOut,
+          accumulatedMinutes: updatedRecord.accumulatedMinutes
       }).eq('id', recordId);
       if (error) console.debug('Supabase Error:', error);
   };
