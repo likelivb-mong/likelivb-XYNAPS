@@ -24,6 +24,7 @@ export enum AttendanceStatus {
   OFF_WORK = 'OFF',
   BREAK = 'BREAK',
   PENDING_APPROVAL = 'PENDING', // 승인 대기 중
+  FORCE_STOPPED = 'FORCE_STOPPED', // 근무정지 (관리자가 강제 퇴근 처리)
 }
 
 export enum AttendanceTag {
@@ -101,4 +102,5 @@ export interface ApprovalRequest {
   endTime?: string; // ISO string, used for CORRECTION requests
   substituteId?: string; // 대타 요청 시 대상 직원 ID
   substituteStatus?: 'PENDING' | 'ACCEPTED' | 'REJECTED'; // 대타 요청 받은 직원의 수락 상태
+  previousRecordSnapshot?: string; // JSON snapshot of attendance record before approval (for undo)
 }

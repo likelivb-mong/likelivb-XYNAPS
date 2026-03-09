@@ -6,6 +6,7 @@ import { Check, X, Clock, AlertTriangle, CalendarCheck, RotateCcw, Archive, Info
 interface ApprovalRequestsProps {
     requests: ApprovalRequest[];
     onAction: (id: string, action: 'APPROVED' | 'REJECTED' | 'PENDING') => void;
+    onUndoApproval?: (id: string) => void;
     employees: Employee[];
 }
 
@@ -18,7 +19,7 @@ const REQUEST_TYPE_LABELS: Record<string, string> = {
     SUBSTITUTE: '대타 요청'
 };
 
-const ApprovalRequests: React.FC<ApprovalRequestsProps> = ({ requests, onAction, employees }) => {
+const ApprovalRequests: React.FC<ApprovalRequestsProps> = ({ requests, onAction, onUndoApproval, employees }) => {
   const [selectedBranch, setSelectedBranch] = useState<BranchCode | 'ALL'>('ALL');
   const [activeTab, setActiveTab] = useState<'PENDING' | 'HISTORY'>('PENDING');
 
@@ -124,10 +125,18 @@ const ApprovalRequests: React.FC<ApprovalRequestsProps> = ({ requests, onAction,
                             )}
                         </div>
                     ) : (
-                        <div className="flex justify-end pt-2 border-t border-black/5 dark:border-white/10">
+                        <div className="flex justify-between items-center pt-2 border-t border-black/5 dark:border-white/10">
                             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${req.status === 'APPROVED' ? 'text-green-600 bg-green-50 dark:bg-green-500/20 dark:text-green-400' : 'text-red-600 bg-red-50 dark:bg-red-500/20 dark:text-red-400'}`}>
                                 {req.status === 'APPROVED' ? '승인됨' : '반려됨'}
                             </span>
+                            {req.status === 'APPROVED' && onUndoApproval && (req.type === 'CORRECTION' || req.type === 'CLOCK_IN') && (
+                                <button
+                                    onClick={() => onUndoApproval(req.id)}
+                                    className="flex items-center gap-1 text-[11px] font-semibold text-zinc-500 hover:text-orange-600 dark:hover:text-orange-400 px-2.5 py-1 rounded-full hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors"
+                                >
+                                    <RotateCcw size={11} /> 승인 취소
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>

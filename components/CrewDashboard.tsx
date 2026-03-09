@@ -12,17 +12,19 @@ interface CrewDashboardProps {
   onDirectClockIn: (rec: AttendanceRecord) => void;
   onDirectClockOut: (recordId: string, endTime: string) => void;
   onNavigateToSchedule: () => void;
+  onNavigate?: (tab: string) => void;
   schedules: Schedule[];
 }
 
-const CrewDashboard: React.FC<CrewDashboardProps> = ({ 
-    currentUser, 
-    attendanceData, 
+const CrewDashboard: React.FC<CrewDashboardProps> = ({
+    currentUser,
+    attendanceData,
     approvalRequests,
     onRequestClockIn,
     onDirectClockIn,
     onDirectClockOut,
     onNavigateToSchedule,
+    onNavigate,
     schedules
 }) => {
   // Real-time state for timer
@@ -51,6 +53,7 @@ const CrewDashboard: React.FC<CrewDashboardProps> = ({
     .sort((a, b) => new Date(b.clockIn).getTime() - new Date(a.clockIn).getTime());
   const lastRecord = userRecords[0];
   const activeRecord = lastRecord?.status === AttendanceStatus.WORKING ? lastRecord : undefined;
+  const isForceStopped = lastRecord?.status === AttendanceStatus.FORCE_STOPPED && lastRecord?.date === todayStr;
 
   // 2. Work Completion Detection (Disabled to allow re-clock in)
   // We want to return to "Clock In" state even after work is done for the day.
@@ -280,6 +283,16 @@ const CrewDashboard: React.FC<CrewDashboardProps> = ({
                                 관리자가 근무 요청을 확인하고 있습니다.<br/>잠시만 기다려주세요.
                             </div>
                         </>
+                    ) : isForceStopped ? (
+                        <>
+                            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
+                                <AlertTriangle className="text-red-500 w-7 h-7" />
+                            </div>
+                            <div className="text-[18px] font-bold text-red-500 mb-2">근무정지</div>
+                            <div className="text-[13px] text-zinc-500 px-8 leading-relaxed mb-4">
+                                관리자가 근무를 정지했습니다.<br/>기록 수정이 필요하면 승인 요청을 보내주세요.
+                            </div>
+                        </>
                     ) : (
                         <>
                              <div className="w-20 h-20 bg-zinc-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4 shadow-inner">
@@ -293,12 +306,19 @@ const CrewDashboard: React.FC<CrewDashboardProps> = ({
 
                 {/* Action Buttons */}
                 <div className="w-full z-10 mt-2 px-4">
-                    {!isWorking ? (
-                        <button 
+                    {isForceStopped ? (
+                        <button
+                            onClick={() => onNavigate?.('requests')}
+                            className="w-full py-4 rounded-[16px] bg-red-500 hover:bg-red-600 text-white font-bold text-[16px] shadow-lg transform transition-all active:scale-95 flex items-center justify-center gap-2"
+                        >
+                            <AlertTriangle size={20} /> 기록 수정 요청하기
+                        </button>
+                    ) : !isWorking ? (
+                        <button
                             onClick={handleClockInClick}
                             disabled={isPending}
                             className={`w-full py-4 rounded-[16px] font-bold text-[16px] shadow-lg transform transition-all active:scale-95 flex items-center justify-center gap-2 ${
-                                isPending 
+                                isPending
                                 ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed dark:bg-white/5 dark:text-zinc-600'
                                 : 'bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
                             }`}

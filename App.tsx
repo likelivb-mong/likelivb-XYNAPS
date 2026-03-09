@@ -155,13 +155,13 @@ const App: React.FC = () => {
   const handleRequestSubmit = async (request: ApprovalRequest) => {
     setApprovalRequests(prev => [request, ...prev]);
     const { error } = await supabase.from('approval_requests').insert([request]);
-    if (error) console.error('Supabase Error:', error);
+    if (error) console.debug('Supabase Error:', error);
   };
 
   const handleRequestCancel = async (id: string) => {
       setApprovalRequests(prev => prev.filter(req => req.id !== id));
       const { error } = await supabase.from('approval_requests').delete().eq('id', id);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleCrewSubstituteResponse = async (id: string, accepted: boolean) => {
@@ -181,13 +181,13 @@ const App: React.FC = () => {
     }));
 
     const { error } = await supabase.from('approval_requests').update(updates).eq('id', id);
-    if (error) console.error('Supabase Error:', error);
+    if (error) console.debug('Supabase Error:', error);
   };
 
   const handleDirectClockIn = async (record: AttendanceRecord) => {
     setAttendanceRecords(prev => [...prev, record]);
     const { error } = await supabase.from('attendance_records').insert([record]);
-    if (error) console.error('Supabase Error:', error);
+    if (error) console.debug('Supabase Error:', error);
   };
 
   const handleDirectClockOut = async (recordId: string, endTime: string) => {
@@ -213,32 +213,74 @@ const App: React.FC = () => {
           status: AttendanceStatus.OFF_WORK,
           accumulatedMinutes: diffMinutes // We should probably recalculate or send this
       }).eq('id', recordId);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
-  
+
+  const handleForceStop = async (recordId: string) => {
+      const record = attendanceRecords.find(r => r.id === recordId);
+      if (!record) return;
+
+      const isForceStopped = record.status === AttendanceStatus.FORCE_STOPPED;
+      let updatedRecord = { ...record };
+
+      if (isForceStopped) {
+          // Toggle OFF: 근무정지 취소 → WORKING 상태로 복귀
+          updatedRecord = {
+              ...record,
+              status: AttendanceStatus.WORKING,
+              clockOut: undefined,
+              accumulatedMinutes: record.accumulatedMinutes // Keep accumulated minutes
+          };
+      } else {
+          // Toggle ON: WORKING → FORCE_STOPPED
+          const now = new Date().toISOString();
+          const start = new Date(record.clockIn).getTime();
+          const end = new Date(now).getTime();
+          const diffMinutes = Math.max(0, Math.floor((end - start) / (1000 * 60)));
+
+          updatedRecord = {
+              ...record,
+              status: AttendanceStatus.FORCE_STOPPED,
+              clockOut: now,
+              accumulatedMinutes: diffMinutes
+          };
+      }
+
+      setAttendanceRecords(prev => prev.map(r => r.id === recordId ? updatedRecord : r));
+
+      const { error } = await supabase.from('attendance_records').update({
+          status: updatedRecord.status,
+          clockOut: updatedRecord.clockOut,
+          accumulatedMinutes: updatedRecord.accumulatedMinutes
+      }).eq('id', recordId);
+      if (error) console.debug('Supabase Error:', error);
+  };
+
   const handleUpdateAttendance = async (updatedRecord: AttendanceRecord) => {
       setAttendanceRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
       const { error } = await supabase.from('attendance_records').update(updatedRecord).eq('id', updatedRecord.id);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleDeleteAttendance = async (recordId: string) => {
       setAttendanceRecords(prev => prev.filter(r => r.id !== recordId));
       const { error } = await supabase.from('attendance_records').delete().eq('id', recordId);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleApprovalAction = async (id: string, action: 'APPROVED' | 'REJECTED' | 'PENDING') => {
     const targetRequest = approvalRequests.find(r => r.id === id);
     if (!targetRequest) return;
-    
-    // 1. Update Request
-    setApprovalRequests(prev => prev.map(req => req.id === id ? { ...req, status: action } : req));
-    await supabase.from('approval_requests').update({ status: action }).eq('id', id);
 
-    if (action !== 'APPROVED') return;
+    if (action !== 'APPROVED') {
+        setApprovalRequests(prev => prev.map(req => req.id === id ? { ...req, status: action } : req));
+        await supabase.from('approval_requests').update({ status: action }).eq('id', id);
+        return;
+    }
 
-    // 2. Side Effects (Create Attendance Records)
+    // 2. Side Effects (Create/Update Attendance Records)
+    let snapshot: string | undefined = undefined;
+
     if (targetRequest.type === 'CLOCK_IN') {
         const newRecord: AttendanceRecord = {
             id: `att-req-${id}`,
@@ -251,23 +293,29 @@ const App: React.FC = () => {
         };
         setAttendanceRecords(prev => [...prev, newRecord]);
         await supabase.from('attendance_records').insert([newRecord]);
+        // snapshot: null means "created new record" — undo = delete
+        snapshot = JSON.stringify({ action: 'CREATED', recordId: newRecord.id });
 
     } else if (targetRequest.type === 'CORRECTION') {
-        // ... (Similar logic for correction, update existing record or create new)
-        // Simplified for brevity - assumes logic mirrors original but calls Supabase
         const existing = attendanceRecords.find(r => r.employeeId === targetRequest.employeeId && r.date === targetRequest.targetDate);
         if (existing) {
+             // Save snapshot BEFORE update for undo
+             snapshot = JSON.stringify({ action: 'UPDATED', record: existing });
+
              let newMinutes = existing.accumulatedMinutes;
              if (targetRequest.startTime && targetRequest.endTime) {
                  const start = new Date(targetRequest.startTime).getTime();
                  const end = new Date(targetRequest.endTime).getTime();
                  newMinutes = Math.floor((end - start) / (1000 * 60));
              }
+             const resolvedStatus = existing.status === AttendanceStatus.FORCE_STOPPED
+                 ? AttendanceStatus.OFF_WORK
+                 : (targetRequest.endTime ? AttendanceStatus.OFF_WORK : existing.status);
              const updated = {
                  ...existing,
                  clockIn: targetRequest.startTime || existing.clockIn,
                  clockOut: targetRequest.endTime || existing.clockOut,
-                 status: targetRequest.endTime ? AttendanceStatus.OFF_WORK : existing.status,
+                 status: resolvedStatus,
                  accumulatedMinutes: newMinutes,
                  tag: AttendanceTag.NORMAL
              };
@@ -292,47 +340,79 @@ const App: React.FC = () => {
             };
             setAttendanceRecords(prev => [...prev, newRecord]);
             await supabase.from('attendance_records').insert([newRecord]);
+            snapshot = JSON.stringify({ action: 'CREATED', recordId: newRecord.id });
         }
     }
+
+    // 1. Update Request status + save snapshot
+    const updatedReq = { status: 'APPROVED' as const, previousRecordSnapshot: snapshot };
+    setApprovalRequests(prev => prev.map(req => req.id === id ? { ...req, ...updatedReq } : req));
+    await supabase.from('approval_requests').update(updatedReq).eq('id', id);
+  };
+
+  const handleUndoApproval = async (id: string) => {
+    const targetRequest = approvalRequests.find(r => r.id === id);
+    if (!targetRequest || targetRequest.status !== 'APPROVED') return;
+
+    // 1. Revert attendance record
+    if (targetRequest.previousRecordSnapshot) {
+        const snap = JSON.parse(targetRequest.previousRecordSnapshot) as
+            | { action: 'CREATED'; recordId: string }
+            | { action: 'UPDATED'; record: AttendanceRecord };
+
+        if (snap.action === 'CREATED') {
+            setAttendanceRecords(prev => prev.filter(r => r.id !== snap.recordId));
+            await supabase.from('attendance_records').delete().eq('id', snap.recordId);
+        } else if (snap.action === 'UPDATED') {
+            setAttendanceRecords(prev => prev.map(r => r.id === snap.record.id ? snap.record : r));
+            await supabase.from('attendance_records').update(snap.record).eq('id', snap.record.id);
+        }
+    }
+
+    // 2. Revert request to PENDING
+    setApprovalRequests(prev => prev.map(req =>
+        req.id === id ? { ...req, status: 'PENDING', previousRecordSnapshot: undefined } : req
+    ));
+    await supabase.from('approval_requests').update({ status: 'PENDING', previousRecordSnapshot: null }).eq('id', id);
   };
 
   // Schedule Handlers
   const handleAddSchedules = async (newSchedules: Schedule[]) => {
       setSchedules(prev => [...prev, ...newSchedules]);
       const { error } = await supabase.from('schedules').insert(newSchedules);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleUpdateSchedule = async (schedule: Schedule) => {
       setSchedules(prev => prev.map(s => s.id === schedule.id ? schedule : s));
       const { error } = await supabase.from('schedules').update(schedule).eq('id', schedule.id);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleDeleteSchedule = async (scheduleId: string) => {
       setSchedules(prev => prev.filter(s => s.id !== scheduleId));
       const { error } = await supabase.from('schedules').delete().eq('id', scheduleId);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   // Employee Handlers
   const handleAddEmployee = async (employee: Employee) => {
       setEmployees(prev => [...prev, employee]);
       const { error } = await supabase.from('employees').insert([employee]);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleUpdateEmployee = async (employee: Employee) => {
       setEmployees(prev => prev.map(e => e.id === employee.id ? employee : e));
       const { error } = await supabase.from('employees').update(employee).eq('id', employee.id);
-      if (error) console.error('Supabase Error:', error);
+      if (error) console.debug('Supabase Error:', error);
   };
 
   const handleDeleteEmployee = async (employeeId: string) => {
       setEmployees(prev => prev.filter(e => e.id !== employeeId));
       const { error } = await supabase.from('employees').delete().eq('id', employeeId);
       if (error) {
-          console.error('Supabase Error:', error);
+          console.debug('Supabase Error:', error);
           alert('삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
       } else {
           alert('직원이 영구삭제되었습니다.');
@@ -343,7 +423,7 @@ const App: React.FC = () => {
     if (userRole === UserRole.MANAGER) {
       switch (activeTab) {
         case 'dashboard':
-          return <Dashboard attendanceData={attendanceRecords} schedules={schedules} employees={employees} />;
+          return <Dashboard attendanceData={attendanceRecords} schedules={schedules} employees={employees} onForceStop={handleForceStop} />;
         case 'schedule':
           return <ScheduleCalendar 
                     currentUser={currentUser!} 
@@ -367,22 +447,23 @@ const App: React.FC = () => {
         case 'payroll':
           return <Payroll attendanceData={attendanceRecords} approvalRequests={approvalRequests} />;
         case 'approvals':
-          return <ApprovalRequests requests={approvalRequests} onAction={handleApprovalAction} employees={employees} />;
+          return <ApprovalRequests requests={approvalRequests} onAction={handleApprovalAction} onUndoApproval={handleUndoApproval} employees={employees} />;
         default:
-          return <Dashboard attendanceData={attendanceRecords} schedules={schedules} employees={employees} />;
+          return <Dashboard attendanceData={attendanceRecords} schedules={schedules} employees={employees} onForceStop={handleForceStop} />;
       }
     } else {
       // Crew Mode Routes
       switch (activeTab) {
         case 'dashboard':
-          return <CrewDashboard 
-            currentUser={currentUser!} 
+          return <CrewDashboard
+            currentUser={currentUser!}
             attendanceData={attendanceRecords}
             approvalRequests={approvalRequests}
             onRequestClockIn={handleRequestSubmit}
             onDirectClockIn={handleDirectClockIn}
             onDirectClockOut={handleDirectClockOut}
             onNavigateToSchedule={() => setActiveTab('schedule')}
+            onNavigate={(tab) => setActiveTab(tab)}
             schedules={schedules}
           />;
         case 'schedule':
@@ -420,14 +501,15 @@ const App: React.FC = () => {
         case 'notifications':
           return <CrewNotifications currentUser={currentUser!} requests={approvalRequests} onSubstituteAction={handleCrewSubstituteResponse} employees={employees} />;
         default:
-          return <CrewDashboard 
-            currentUser={currentUser!} 
+          return <CrewDashboard
+            currentUser={currentUser!}
             attendanceData={attendanceRecords}
             approvalRequests={approvalRequests}
             onRequestClockIn={handleRequestSubmit}
             onDirectClockIn={handleDirectClockIn}
             onDirectClockOut={handleDirectClockOut}
             onNavigateToSchedule={() => setActiveTab('schedule')}
+            onNavigate={(tab) => setActiveTab(tab)}
             schedules={schedules}
           />;
       }
